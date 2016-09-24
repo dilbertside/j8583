@@ -20,15 +20,22 @@ package com.solab.iso8583;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.nio.charset.Charset;
 import java.text.ParseException;
 import java.util.*;
+import java.util.Map.Entry;
 
 import com.solab.iso8583.parse.DateTimeParseInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.solab.iso8583.annotation.Iso8583;
+import com.solab.iso8583.annotation.Iso8583Field;
 import com.solab.iso8583.parse.ConfigParser;
 import com.solab.iso8583.parse.FieldParseInfo;
+import com.solab.iso8583.util.PojoUtils;
 
 /** This class is used to create messages, either from scratch or from an existing String or byte
  * buffer. It can be configured to put default values on newly created messages, and also to know
@@ -645,4 +652,242 @@ public class MessageFactory<T extends IsoMessage> {
 		parseOrder.put(type, index);
 	}
 
+	/**
+	 * Map retaining pojo fields type for each message template<br> key is
+	 * template index value is a map of field index / pojo property definition
+	 */
+	protected Map<Integer, Map<Integer, IsoField<?>>> templateIsoFieldsMap;
+
+	/**
+	 * see {@link #templateIsoFieldsMap}
+	 * 
+	 * @return the templateIsoFieldsMap
+	 */
+	public Map<Integer, Map<Integer, IsoField<?>>> getTemplateIsoFieldsMap() {
+		return templateIsoFieldsMap;
+	}
+
+	/**
+	 * register a pojo annotated with Iso8583
+	 * 
+	 * @param clazz
+	 *            Pojo class type to parse
+	 * @return {@link IsoMessage} definition just added
+	 */
+	public T registerMessage(Class<?> clazz) {
+		if(null == clazz){
+			throw new IllegalArgumentException("pojo type is empty");
+		}
+		if (null == templateIsoFieldsMap)
+			templateIsoFieldsMap = new HashMap<>();
+		T isoMessageTemplate = registerPojo(clazz);
+		if(null == isoMessageTemplate){
+			throw new IllegalArgumentException(clazz.getName() + " does not contain an @Iso8583 annotation to register a message type");
+		}
+		Map<Integer, IsoField<?>> isoFields = setIsoPojoFields(clazz, isoMessageTemplate);
+		templateIsoFieldsMap.put(isoMessageTemplate.getType(), isoFields);
+		return isoMessageTemplate;
+	}
+
+	/**
+	 * parse a pojo class definition to create a message template definition<br>
+	 * register headers if any<br>
+	 * set binary type if set<br>
+	 * set encoding if set
+	 * 
+	 * @param clazz
+	 *            pojo class to register annotated with {@link Iso8583}
+	 * @return new Message Template definition, may be null
+	 */
+	protected T registerPojo(final Class<?> clazz) {
+		T isoMessageTemplate = null;
+		Annotation annotation = clazz.getAnnotation(Iso8583.class);
+		if (annotation instanceof Iso8583) {
+			Iso8583 iso8583 = (Iso8583) annotation;
+			isoMessageTemplate = newMessage(iso8583.type());
+			isoMessageTemplate.setBinary(iso8583.binary());
+			if (iso8583.header() != null && !iso8583.header().isEmpty()) {
+				if (iso8583.binary())
+					isoMessageTemplate.setBinaryIsoHeader(iso8583.header().getBytes());
+				else
+					isoMessageTemplate.setIsoHeader(iso8583.header());
+			}
+			if (iso8583.encoding() != null && !iso8583.encoding().isEmpty()) {
+				Charset charset = Charset.forName(iso8583.encoding());
+				isoMessageTemplate.setCharacterEncoding(charset.name());
+			}
+			addMessageTemplate(isoMessageTemplate);
+		}
+		return isoMessageTemplate;
+	}
+
+	/**
+	 * parse all pojo fields annotated
+	 * 
+	 * @param clazz
+	 *            pojo class to parse for annotated fields with
+	 *            {@link Iso8583Field}
+	 * @return {@link Map} never null, may be empty if no properties are
+	 *         annotated
+	 */
+	protected Map<Integer, IsoField<?>> setIsoPojoFields(final Class<?> clazz, T isoMessageTemplate) {
+		Field[] fields = clazz.getDeclaredFields();
+		Map<Integer, IsoField<?>> indexIsoFieldMap = new HashMap<>();
+		Iso8583Field iso8583Field;
+		for (Field field : fields) {
+			iso8583Field = field.getAnnotation(Iso8583Field.class);
+			if (null != iso8583Field) {
+				IsoField<?> isoField = new IsoField<>(iso8583Field, field.getType());
+				if (null == isoField.getName() || isoField.getName().isEmpty())
+					isoField.setName(field.getName());
+				isoField.setPropertyName(field.getName());
+				defineField(isoField, field.getType(), isoMessageTemplate);
+				indexIsoFieldMap.put(iso8583Field.index(), isoField);
+			}
+		}
+		return indexIsoFieldMap;
+
+	}
+
+	/**
+	 * build a message from a pojo instance<br>
+	 * must be registered priorly with {@link #registerMessage(Class)}
+	 * 
+	 * @param instance
+	 *            pojo instance to set values in
+	 * @return the T message
+	 * @throws IllegalArgumentException
+	 */
+	public T newMessage(Object instance) throws IllegalArgumentException {
+		if (null != instance) {
+			T isoMessage = null;
+			Annotation annotation = instance.getClass().getAnnotation(Iso8583.class);
+			int templateType = 0;
+			if (null != annotation) {
+				templateType = ((Iso8583) annotation).type();
+				isoMessage = getMessageTemplate(templateType);
+			}
+			if (templateType == 0 || null == annotation || null == templateIsoFieldsMap) {
+				// should happened only during hot debugging session
+				// warning to developer, see example in
+				// com.solab.iso8583.TestPojoIsoMessage#setup and others test
+				throw new IllegalArgumentException(String.format("Please register this class [%s] as ISO8583 POJO ",
+						instance.getClass().getSimpleName()));
+			}
+			Map<Integer, IsoField<?>> isoFields = templateIsoFieldsMap.get(templateType);
+			for (Entry<Integer, IsoField<?>> entry : isoFields.entrySet()) {
+				String propName = entry.getValue().getPropertyName();
+				Object value = PojoUtils.readField(instance, propName, entry.getValue().getFieldClass());
+				switch (entry.getValue().index) {
+				case 7:
+					if(null == value && setDate){
+						isoMessage.setValue(7, new Date(), IsoType.DATE10, 10);
+						continue;
+					}
+					break;
+				case 11:
+					if(null == value && traceGen != null){
+						isoMessage.setValue(11, traceGen.nextTrace(), IsoType.NUMERIC, 6);
+						continue;
+					}
+					break;
+				default:
+					break;
+				}
+				isoMessage.setField(entry.getValue().index,
+						new IsoValue<>(entry.getValue().getIsoType(),
+								value,
+								entry.getValue().length));
+			}
+			return isoMessage;
+		}
+		return null;
+	}
+
+	/**
+	 * used during pojo template registration
+	 * 
+	 * @param fieldDef
+	 * @param clazz
+	 * @param isoMessageTemplate
+	 * @return
+	 */
+	protected T defineField(IsoField<?> fieldDef, Class<?> clazz, T isoMessageTemplate) {
+		switch (fieldDef.getIsoType()) {
+		case ALPHA:
+		case LLLLVAR:
+		case LLVAR:
+		case LLLVAR:
+			isoMessageTemplate.setField(fieldDef.index,
+					new IsoValue<String>(fieldDef.getIsoType(), fieldDef.getIsoType().getLength(), null));
+			break;
+		case NUMERIC:
+			isoMessageTemplate.setField(fieldDef.getIndex(), new IsoValue<Number>(fieldDef.getIsoType(),
+					fieldDef.getLength(), new IsoField.NumberCustomField()));
+			break;
+		case BINARY:
+		case LLBIN:
+		case LLLBIN:
+		case LLLLBIN:
+			isoMessageTemplate.setField(fieldDef.index,
+					new IsoValue<Byte[]>(fieldDef.getIsoType(), fieldDef.getIsoType().getLength(), null));
+			break;
+		default:
+			isoMessageTemplate.setField(fieldDef.index,
+					new IsoValue<>(fieldDef.getIsoType(), fieldDef.getIsoType().getLength(), null));
+			break;
+		}
+		return isoMessageTemplate;
+	}
+
+	/**
+	 * Convenience method for translating a {@link IsoMessage} to a registered
+	 * pojo template<br>
+	 * very comprehensive will not
+	 * 
+	 * @param isoMessage
+	 *            iso message to convert
+	 * @param clazz
+	 *            pojo type to convert to
+	 * @return pojo of type clazz, or null if parameters are not set
+	 */
+	public <P> P parseMessage(final T isoMessage, Class<P> clazz) {
+		if (null == isoMessage || clazz == null)
+			return null;
+		P instance;
+		try {
+			instance = clazz.newInstance();
+			Annotation annotation = instance.getClass().getAnnotation(Iso8583.class);
+			int templateType = 0;
+			T isoMessageTemplate = null;
+			if (null != annotation) {
+				templateType = ((Iso8583) annotation).type();
+				isoMessageTemplate = getMessageTemplate(templateType);
+			}
+			if (null == isoMessageTemplate || templateType == 0 || null == annotation || null == templateIsoFieldsMap) {
+				// should happened only during hot debugging session
+				// warning to developer, see example in
+				// com.solab.iso8583.TestPojoIsoMessage#setup and others test
+				throw new IllegalArgumentException(String.format("Please register this class [%s] as ISO8583 POJO ",
+						instance.getClass().getSimpleName()));
+			}
+			if (isoMessageTemplate.getType() != isoMessage.getType())
+				throw new IllegalArgumentException(
+						String.format("iso message type %d and pojo template definition do not match, %s",
+								isoMessage.getType(), clazz.getSimpleName()));
+			Map<Integer, IsoField<?>> isoFields = templateIsoFieldsMap.get(templateType);
+			for (Entry<Integer, IsoField<?>> entry : isoFields.entrySet()) {
+				String propName = entry.getValue().getPropertyName();
+				if (isoMessage.hasField(entry.getValue().getIndex())) {
+					IsoValue<?> isoValue = isoMessage.getField(entry.getValue().getIndex());
+					Object value = entry.getValue().getValueSafeCast(isoValue);
+					PojoUtils.writeField(instance, propName, entry.getValue().getFieldClass(), value);
+				}
+			}
+		} catch (InstantiationException | IllegalAccessException e) {
+			log.trace("pojo parse message failed with error %s", e.getMessage());
+			throw new IllegalArgumentException(e);
+		}
+		return instance;
+	}
 }

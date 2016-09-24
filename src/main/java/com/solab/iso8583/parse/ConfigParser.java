@@ -481,4 +481,42 @@ public class ConfigParser {
 			| ((type.charAt(2) - 48) << 4) | (type.charAt(3) - 48);
 	}
 
+	/**
+	 * Creates a message factory configured from an array of pojo class definitions
+	 * @param clazzz array of pojo to register, if empty return {@link #createDefault()} built message factory 
+	 * @return {@link MessageFactory}
+	 * @throws IOException
+	 */
+	public static MessageFactory<IsoMessage> createFromPojo(Class<?>... clazzz) throws IOException{
+		if(null != clazzz && clazzz.length > 0){
+			MessageFactory<IsoMessage> mfact = new MessageFactory<IsoMessage>();
+			for (Class<?> clazz : clazzz) {
+				IsoMessage isoMessage = mfact.registerMessage(clazz);
+				//set the parsing guides
+				parseGuides(isoMessage, mfact);
+			}
+			return mfact;
+		}
+		return createDefault();
+	}
+	
+
+	protected static <T extends IsoMessage> void parseGuides(final T isoMessage, final MessageFactory<T> mfact) {
+		HashMap<Integer, FieldParseInfo> parseMap = new HashMap<>();
+		for (int indexField : isoMessage.getAllFields()) {
+			FieldParseInfo fieldParseInfo = getParser(isoMessage.getField(indexField), mfact);
+			parseMap.put(indexField, fieldParseInfo);
+		}
+		mfact.setParseMap(isoMessage.getType(), parseMap);
+	}
+
+	protected static <T extends IsoMessage> FieldParseInfo getParser(IsoValue<?> isoValue, MessageFactory<T> mfact) {
+        IsoType itype = isoValue.getType();
+        int length = 0;
+        if (isoValue.getLength() > 0)
+            length = isoValue.getLength();
+        FieldParseInfo fpi = FieldParseInfo.getInstance(itype, length, mfact.getCharacterEncoding());
+        fpi.setDecoder(isoValue.getEncoder());
+        return fpi;
+    }
 }

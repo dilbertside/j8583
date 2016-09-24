@@ -25,7 +25,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.BitSet;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /** Represents an ISO8583 message. This is the core class of the framework.
  * Contains the bitmap which is modified as fields are added/removed.
@@ -553,5 +555,20 @@ public class IsoMessage {
             }
         }
         return false;
+    }
+    
+    /**
+     * convenience to  retrieve all defined fields 
+     * @return array of fields currently defined
+     */
+    public Integer[] getAllFields() {
+    	Set<Integer> a = new HashSet<>(50); 
+    	for (int i = 0; i < fields.length; i++) {
+    		if (hasField(i)) {
+    			a.add(i);
+    		}
+			
+		}
+		return a.toArray(new Integer[a.size()]);
     }
 }

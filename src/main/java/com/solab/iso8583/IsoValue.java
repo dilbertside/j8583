@@ -59,7 +59,7 @@ public class IsoValue<T> implements Cloneable {
 	 */
 	public IsoValue(IsoType t, T value, CustomField<T> custom) {
 		if (t.needsLength()) {
-			throw new IllegalArgumentException("Fixed-value types must use constructor that specifies length");
+			throw new IllegalArgumentException(String.format("Fixed-value types %s must use constructor that specifies length", t != null ? t.name() : "unknown"));
 		}
 		encoder = custom;
 		type = t;
@@ -149,6 +149,40 @@ public class IsoValue<T> implements Cloneable {
                 }
 				length = custom == null ? ((byte[])val).length : custom.encodeField(value).length();
 			}
+			if (t == IsoType.LLBIN && length > 99) {
+				throw new IllegalArgumentException("LLBIN can only hold values up to 99 chars");
+			} else if (t == IsoType.LLLBIN && length > 999) {
+				throw new IllegalArgumentException("LLLBIN can only hold values up to 999 chars");
+            } else if (t == IsoType.LLLLBIN && length > 9999) {
+                throw new IllegalArgumentException("LLLLBIN can only hold values up to 9999 chars");
+			}
+		}
+	}
+
+	/**
+	 * For pojo parse definition we need only following parameters to make happy the parsing mechanism<br>
+	 * Kept as-is for XML backward compatibility<br>
+	 * We validate definition not the value as in XML<br>
+	 * Do NOT use this constructor for parsing
+	 * @param t {@link IsoType}
+	 * @param len field length
+	 * @param custom {@link CustomField}
+	 */
+	public IsoValue(IsoType t, int len, CustomField<T> custom) {
+		type = t;
+		length = len;
+		encoder = custom;
+		if (length == 0 && t.needsLength()) {
+			throw new IllegalArgumentException(String.format("Length must be greater than zero for type %s", t));
+		} else if (t == IsoType.LLVAR || t == IsoType.LLLVAR || t == IsoType.LLLLVAR) {
+			if (t == IsoType.LLVAR && length > 99) {
+				throw new IllegalArgumentException("LLVAR can only hold values up to 99 chars");
+			} else if (t == IsoType.LLLVAR && length > 999) {
+				throw new IllegalArgumentException("LLLVAR can only hold values up to 999 chars");
+            } else if (t == IsoType.LLLLVAR && length > 9999) {
+                throw new IllegalArgumentException("LLLLVAR can only hold values up to 9999 chars");
+			}
+		} else if (t == IsoType.LLBIN || t == IsoType.LLLBIN || t == IsoType.LLLLBIN) {
 			if (t == IsoType.LLBIN && length > 99) {
 				throw new IllegalArgumentException("LLBIN can only hold values up to 99 chars");
 			} else if (t == IsoType.LLLBIN && length > 999) {
