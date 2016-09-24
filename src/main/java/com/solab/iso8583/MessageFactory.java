@@ -767,7 +767,7 @@ public class MessageFactory<T extends IsoMessage> {
 				templateType = ((Iso8583) annotation).type();
 				isoMessage = getMessageTemplate(templateType);
 			}
-			if (templateType == 0 || null == annotation || null == templateIsoFieldsMap) {
+			if (templateType == 0 || null == annotation || null == templateIsoFieldsMap || templateIsoFieldsMap.get(templateType) == null) {
 				// should happened only during hot debugging session
 				// warning to developer, see example in
 				// com.solab.iso8583.TestPojoIsoMessage#setup and others test

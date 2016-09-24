@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory;
 import com.solab.iso8583.IsoMessage;
 import com.solab.iso8583.IsoType;
 import com.solab.iso8583.MessageFactory;
+import com.solab.iso8583.annotation.Iso8583;
+import com.solab.iso8583.annotation.Iso8583Field;
 import com.solab.iso8583.impl.SimpleTraceGenerator;
 import com.solab.iso8583.parse.ConfigParser;
 
@@ -137,4 +139,17 @@ public class TestPojoIsoMessage {
 		Assert.assertEquals(request.getSystemTraceAuditNumber(), nmr.getSystemTraceAuditNumber());
 	}
 
+	@Iso8583(type=0x200)
+	public static class NotRegisteredPojo{
+		@Iso8583Field(index=70, type=IsoType.NUMERIC, length=3)
+		public Number codeInformationNetwork;
+	}
+	
+	/**
+	 * Test method for {@link com.solab.iso8583.MessageFactory#newMessage(Object)}.
+	 */
+	@Test(expected=IllegalArgumentException.class)
+	public void testNewMessageNotRegistered(){
+		mf.newMessage(new NotRegisteredPojo());
+	}
 }
