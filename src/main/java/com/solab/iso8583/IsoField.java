@@ -377,8 +377,11 @@ public class IsoField<T extends Object> {
 	public static class NumberCustomField implements CustomField<Number>{
 		@Override
 		public Number decodeField(String value) {
-			if(StringUtils.isNotBlank(value))
-				return NumberUtils.createNumber(value.replaceAll("\\D+", "").trim());
+			if(StringUtils.isNotBlank(value)){
+				value = value.replaceAll("\\D+", "").trim();//rmove all non numeric chars
+				if(StringUtils.isNotBlank(value))//once more at it happens sometimes value sent is "null" as string or garbage
+					return NumberUtils.createNumber(value);
+			}
 			return null;
 		}
 		@Override
