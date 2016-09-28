@@ -731,7 +731,7 @@ public class MessageFactory<T extends IsoMessage> {
 	 *         annotated
 	 */
 	protected Map<Integer, IsoField<?>> setIsoPojoFields(final Class<?> clazz, T isoMessageTemplate) {
-		Field[] fields = clazz.getDeclaredFields();
+		Field[] fields = PojoUtils.getAllDeclaredFields(clazz);
 		Map<Integer, IsoField<?>> indexIsoFieldMap = new HashMap<>();
 		Iso8583Field iso8583Field;
 		for (Field field : fields) {
@@ -819,7 +819,7 @@ public class MessageFactory<T extends IsoMessage> {
 		case LLVAR:
 		case LLLVAR:
 			isoMessageTemplate.setField(fieldDef.index,
-					new IsoValue<String>(fieldDef.getIsoType(), fieldDef.getIsoType().getLength(), null));
+					new IsoValue<String>(fieldDef.getIsoType(), fieldDef.getLength(), null));
 			break;
 		case NUMERIC:
 			isoMessageTemplate.setField(fieldDef.getIndex(), new IsoValue<Number>(fieldDef.getIsoType(),
@@ -830,11 +830,11 @@ public class MessageFactory<T extends IsoMessage> {
 		case LLLBIN:
 		case LLLLBIN:
 			isoMessageTemplate.setField(fieldDef.index,
-					new IsoValue<Byte[]>(fieldDef.getIsoType(), fieldDef.getIsoType().getLength(), null));
+					new IsoValue<Byte[]>(fieldDef.getIsoType(), fieldDef.getLength(), null));
 			break;
 		default:
 			isoMessageTemplate.setField(fieldDef.index,
-					new IsoValue<>(fieldDef.getIsoType(), fieldDef.getIsoType().getLength(), null));
+					new IsoValue<>(fieldDef.getIsoType(), fieldDef.getLength() == 0 ? fieldDef.getIsoType().getLength() : fieldDef.getLength(), null));
 			break;
 		}
 		return isoMessageTemplate;

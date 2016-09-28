@@ -8,9 +8,12 @@ import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.reflect.FieldUtils;
 
 /**
@@ -122,6 +125,22 @@ public class PojoUtils {
 		return result;
 	}
 
+	/**
+	 * This variant retrieves {@link Class#getDeclaredFields()} from a local cache
+	 * in order to avoid the JVM's SecurityManager check and defensive array copying.
+	 * @param clazz the class to introspect
+	 * @return the cached array of fields
+	 * @see #getDeclaredFields(Class)
+	 */
+	public static Field[] getAllDeclaredFields(Class<?> clazz) {
+		Field[] fields = new Field[0];
+		Class<?> searchType = clazz;
+    while (Object.class != searchType && searchType != null) {
+    	fields = (Field[]) ArrayUtils.addAll(fields, getDeclaredFields(searchType));
+    	searchType = searchType.getSuperclass();
+    }
+    return fields;
+	}
   /**
    * @return the declaredFieldsCacheSize
    */
