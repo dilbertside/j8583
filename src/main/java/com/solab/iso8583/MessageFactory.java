@@ -22,17 +22,21 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.text.ParseException;
 import java.util.*;
 import java.util.Map.Entry;
 
 import com.solab.iso8583.parse.DateTimeParseInfo;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.solab.iso8583.IsoField.CompositeFieldPojo;
 import com.solab.iso8583.annotation.Iso8583;
 import com.solab.iso8583.annotation.Iso8583Field;
+import com.solab.iso8583.codecs.CompositeField;
 import com.solab.iso8583.parse.ConfigParser;
 import com.solab.iso8583.parse.FieldParseInfo;
 import com.solab.iso8583.util.PojoUtils;
@@ -684,7 +688,7 @@ public class MessageFactory<T extends IsoMessage> {
 		if(null == isoMessageTemplate){
 			throw new IllegalArgumentException(clazz.getName() + " does not contain an @Iso8583 annotation to register a message type");
 		}
-		Map<Integer, IsoField<?>> isoFields = setIsoPojoFields(clazz, isoMessageTemplate);
+		Map<Integer, IsoField<?>> isoFields = setIsoPojoFields(clazz, isoMessageTemplate, false);
 		templateIsoFieldsMap.put(isoMessageTemplate.getType(), isoFields);
 		return isoMessageTemplate;
 	}
@@ -722,15 +726,15 @@ public class MessageFactory<T extends IsoMessage> {
 	}
 
 	/**
-	 * parse all pojo fields annotated
+	 * parse all pojo fields annotated, and annotated nested objects 
 	 * 
-	 * @param clazz
-	 *            pojo class to parse for annotated fields with
-	 *            {@link Iso8583Field}
-	 * @return {@link Map} never null, may be empty if no properties are
+	 * @param clazz pojo class to parse for annotated fields with {@link Iso8583Field}
+	 * @param isoMessageTemplate message template to define fields from annotations
+	 * @param nested <code>false</code> for primary field, <code>true</code> for nested
+	 * @return {@link Map} never <code>null</code>, may be empty if no properties are
 	 *         annotated
 	 */
-	protected Map<Integer, IsoField<?>> setIsoPojoFields(final Class<?> clazz, T isoMessageTemplate) {
+	protected Map<Integer, IsoField<?>> setIsoPojoFields(final Class<?> clazz, T isoMessageTemplate, boolean nested) {
 		Field[] fields = PojoUtils.getAllDeclaredFields(clazz);
 		Map<Integer, IsoField<?>> indexIsoFieldMap = new HashMap<>();
 		Iso8583Field iso8583Field;
@@ -741,12 +745,45 @@ public class MessageFactory<T extends IsoMessage> {
 				if (null == isoField.getName() || isoField.getName().isEmpty())
 					isoField.setName(field.getName());
 				isoField.setPropertyName(field.getName());
-				defineField(isoField, field.getType(), isoMessageTemplate);
+				if(iso8583Field.nestedField()){
+					if(!field.getDeclaringClass().isPrimitive()){//check if is not a primitive
+						Map<Integer, IsoField<?>> nestedIndexIsoFieldMap = setIsoPojoFields(field.getType(), isoMessageTemplate, true);
+						CompositeFieldPojo compositeField = new CompositeFieldPojo();
+						for (Entry<Integer, IsoField<?>> entry : nestedIndexIsoFieldMap.entrySet()) {
+							//here the index does not have the same meaning, not used as a ISO 8583 unique index, 
+							//used for ordering fields in the private L...VAR
+							IsoField<?> nestedIsoField = entry.getValue();
+							isoField.addNestedField(isoField.getPropertyName(), entry.getValue());
+							compositeField.addValue(buildIsoField(nestedIsoField, nestedIsoField.getFieldClass(), null));
+						}
+						isoMessageTemplate.setField(iso8583Field.index(), new IsoValue<>(isoField.getIsoType(), isoField.getLength(), compositeField));
+					}else{
+						//blatant mis-configuration, we better notice the dev
+						throw new IllegalArgumentException(String.format("A nested Field cannot be of a primitive type [%s]",
+								field.getType().getSimpleName()));
+					}
+				}else if(iso8583Field.customField()){
+					isoField.setCustom(true);
+					CompositeField compositeField = new CompositeField();
+					CustomBinaryField<?> customBinaryField = null;
+					try {
+						customBinaryField = iso8583Field.customFieldMapper().newInstance();
+					} catch (InstantiationException | IllegalAccessException e) {
+						//that fails often when a default constructor is not provided
+						throw new IllegalArgumentException(String.format("Failed to instantiate a new CustomField derived class [%s], with message [%s]", 
+								iso8583Field.customFieldMapper().getTypeName(), e.getMessage() ), e);
+					}
+					IsoValue<?> isoValue = buildIsoField(isoField, isoField.getFieldClass(), customBinaryField);
+					compositeField.addValue(isoValue);
+					isoMessageTemplate.setField(iso8583Field.index(), new IsoValue<>(isoField.getIsoType(), isoField.getLength(), compositeField));
+				} else {
+					if(!nested)
+						defineField(isoField, field.getType(), isoMessageTemplate);
+				}
 				indexIsoFieldMap.put(iso8583Field.index(), isoField);
 			}
 		}
 		return indexIsoFieldMap;
-
 	}
 
 	/**
@@ -770,15 +807,16 @@ public class MessageFactory<T extends IsoMessage> {
 			if (templateType == 0 || null == annotation || null == templateIsoFieldsMap || templateIsoFieldsMap.get(templateType) == null) {
 				// should happened only during hot debugging session
 				// warning to developer, see example in
-				// com.solab.iso8583.TestPojoIsoMessage#setup and others test
-				throw new IllegalArgumentException(String.format("Please register this class [%s] as ISO8583 POJO ",
+				// com.solab.iso8583.TestPojoIsoMessage#setup and other tests
+				throw new IllegalArgumentException(String.format("Please register this class [%s] as ISO8583 POJO [%s]",
 						instance.getClass().getSimpleName()));
 			}
 			Map<Integer, IsoField<?>> isoFields = templateIsoFieldsMap.get(templateType);
 			for (Entry<Integer, IsoField<?>> entry : isoFields.entrySet()) {
-				String propName = entry.getValue().getPropertyName();
-				Object value = PojoUtils.readField(instance, propName, entry.getValue().getFieldClass());
-				switch (entry.getValue().index) {
+				IsoField<?> isoField = entry.getValue();
+				String propName = isoField.getPropertyName();
+				Object value = PojoUtils.readField(instance, propName, isoField.getFieldClass());
+				switch (isoField.index) {
 				case 7:
 					if(null == value && setDate){
 						isoMessage.setValue(7, new Date(), IsoType.DATE10, 10);
@@ -794,10 +832,31 @@ public class MessageFactory<T extends IsoMessage> {
 				default:
 					break;
 				}
-				isoMessage.setField(entry.getValue().index,
-						new IsoValue<>(entry.getValue().getIsoType(),
-								value,
-								entry.getValue().length));
+				log.debug(isoField.toString());
+				if(isoField.isNested()){
+					Object objectCompositeField = isoMessage.getField(isoField.index).getEncoder();
+					if(objectCompositeField instanceof CompositeFieldPojo){
+						CompositeFieldPojo compositeField = (CompositeFieldPojo) objectCompositeField; 
+						for (IsoField<?> nestedIsoField : isoField.getAllNestedField(isoField.getPropertyName())) {
+							Object nestedValue = PojoUtils.readField(value, nestedIsoField.getPropertyName(), nestedIsoField.getFieldClass());
+							compositeField.setField(nestedIsoField.index, new IsoValue<>(nestedIsoField.getIsoType(), nestedValue, nestedIsoField.length));
+						}
+						isoMessage.setValue(isoField.index, compositeField, compositeField, isoField.getIsoType(), isoField.length);
+					}
+						
+				} else if(isoField.isCustom()){
+					Object objectCompositeField = isoMessage.getField(isoField.index).getEncoder();
+					if(objectCompositeField instanceof CompositeField){
+						CompositeField compositeField = (CompositeField) objectCompositeField;
+						isoMessage.setValue(isoField.index, compositeField, compositeField, isoField.getIsoType(), isoField.length);
+					}
+						
+				}else{
+					isoMessage.setField(isoField.index,
+							new IsoValue<>(isoField.getIsoType(),
+									value,
+									isoField.length));
+				}
 			}
 			return isoMessage;
 		}
@@ -810,40 +869,54 @@ public class MessageFactory<T extends IsoMessage> {
 	 * @param fieldDef
 	 * @param clazz
 	 * @param isoMessageTemplate
-	 * @return
+	 * @return isoMessageTemplate
 	 */
 	protected T defineField(IsoField<?> fieldDef, Class<?> clazz, T isoMessageTemplate) {
+		if(null != fieldDef && null != clazz)
+			isoMessageTemplate.setField(fieldDef.getIndex(), buildIsoField(fieldDef, clazz, null));
+		return isoMessageTemplate;
+	}
+	
+	@SuppressWarnings("unchecked")
+	protected IsoValue<?> buildIsoField(final IsoField<?> fieldDef, Class<?> clazz, CustomField<?> customField){
+		IsoValue<?> isoValue;
 		switch (fieldDef.getIsoType()) {
 		case ALPHA:
 		case LLLLVAR:
 		case LLVAR:
 		case LLLVAR:
-			isoMessageTemplate.setField(fieldDef.index,
-					new IsoValue<String>(fieldDef.getIsoType(), fieldDef.getLength(), null));
+			CustomField<String> customFieldString = null;
+			if(null != customField && PojoUtils.isAssignable(customField.getClass(), String.class)){
+			  customFieldString = (CustomField<String>) customField;
+			}
+			isoValue = new IsoValue<String>(fieldDef.getIsoType(), fieldDef.getLength(), customFieldString);
 			break;
 		case NUMERIC:
-			isoMessageTemplate.setField(fieldDef.getIndex(), new IsoValue<Number>(fieldDef.getIsoType(),
-					fieldDef.getLength(), new IsoField.NumberCustomField()));
+			isoValue = new IsoValue<Number>(fieldDef.getIsoType(),	fieldDef.getLength(), new IsoField.NumberCustomField());
 			break;
 		case BINARY:
 		case LLBIN:
 		case LLLBIN:
 		case LLLLBIN:
-			isoMessageTemplate.setField(fieldDef.index,
-					new IsoValue<Byte[]>(fieldDef.getIsoType(), fieldDef.getLength(), null));
+			CustomField<Byte[]> customFieldByte = null;
+			if(null != customField && PojoUtils.isAssignable(customField.getClass(), Byte[].class)){
+			  customFieldString = (CustomField<String>) customField;
+			}
+			isoValue = new IsoValue<Byte[]>(fieldDef.getIsoType(), fieldDef.getLength(), customFieldByte);
+			break;
+		case AMOUNT:
+			isoValue = new IsoValue<BigDecimal>(fieldDef.getIsoType(), fieldDef.getIsoType().getLength(), new IsoField.AmountCustomField());
 			break;
 		default:
-			isoMessageTemplate.setField(fieldDef.index,
-					new IsoValue<>(fieldDef.getIsoType(), fieldDef.getLength() == 0 ? fieldDef.getIsoType().getLength() : fieldDef.getLength(), null));
+			isoValue = new IsoValue<>(fieldDef.getIsoType(), fieldDef.getLength() == 0 ? fieldDef.getIsoType().getLength() : fieldDef.getLength(), customField);
 			break;
 		}
-		return isoMessageTemplate;
+		return isoValue;
 	}
 
 	/**
 	 * Convenience method for translating a {@link IsoMessage} to a registered
 	 * pojo template<br>
-	 * very comprehensive will not
 	 * 
 	 * @param isoMessage
 	 *            iso message to convert

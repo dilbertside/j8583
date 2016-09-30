@@ -562,13 +562,12 @@ public class IsoMessage {
      * @return array of fields currently defined
      */
     public Integer[] getAllFields() {
-    	Set<Integer> a = new HashSet<>(50); 
-    	for (int i = 0; i < fields.length; i++) {
-    		if (hasField(i)) {
-    			a.add(i);
-    		}
-			
-		}
-		return a.toArray(new Integer[a.size()]);
+    	  Set<Integer> a = new HashSet<>(50); 
+    	  for (int i = 0; i < fields.length; i++) {
+    		    if (hasField(i)) {
+    			      a.add(i);
+    		    }
+		    }
+		    return a.toArray(new Integer[a.size()]);
     }
 }

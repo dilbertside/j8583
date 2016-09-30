@@ -5,6 +5,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import com.solab.iso8583.CustomBinaryField;
+import com.solab.iso8583.IsoField.DefaultCustomStringField;
 import com.solab.iso8583.IsoType;
 
 /**
@@ -35,5 +37,25 @@ public @interface Iso8583Field {
 	 * used with {@link com.solab.iso8583.IsoType#NUMERIC}
 	 */
 	public int length() default 0;
+	
+	/**
+	 * flag to indicate if a field will be an other object to introspect to retrieve encoded private fields<br>
+	 * Not applicable for primitive objects
+	 * incompatible with {@link #customField()}
+	 */
+	public boolean nestedField() default false;
+	
+	/**
+	 *  flag to indicate if a field will be handled by a {@link CustomField} encoder/decoder
+	 *  {@link #customFieldMapper()} will be used to handle the fields<br>
+	 *  cannot be set with {@link #nestedField()}
+	 */
+	public boolean customField() default false;
+	
+	/**
+	 * if {@link #customField()} is set, define a {@link CustomField} encoder/decoder here<br>
+	 * ignored if {@link #nestedField()} is set to true
+	 */
+	Class<? extends CustomBinaryField<?>> customFieldMapper() default DefaultCustomStringField.class;
 	
 }

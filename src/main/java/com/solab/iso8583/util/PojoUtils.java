@@ -7,14 +7,15 @@ import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.WeakHashMap;
 
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.reflect.FieldUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.reflect.TypeUtils;
 
 /**
  * Simple utility class for working with the reflection API<br>
@@ -163,4 +164,54 @@ public class PojoUtils {
     }
   }
 
+  /**
+	 * search and detect if parameterized class is of type needed<br>
+	 * Example this method will search if<br> 
+	 * <code>class DefaultCustomStringField implements CustomBinaryField<String></code><br>
+	 * has generic parameterized as String<br>
+	 * the above to avoid cast which fails at runtime.
+	 * @param parameterizedClass to search
+	 * @param classParameterizedType target
+	 * @return true 
+	 */
+	public static boolean isAssignable(final Class<?> parameterizedClass, final Class<?> classParameterizedType) {
+		ParameterizedType parameterizedType = extractParameterizedTypeFromInterface(parameterizedClass);
+		if (parameterizedType == null) {
+			//Class and any of its interfaces are not parameterized
+			parameterizedType = extractParameterizedTypeFromClass(parameterizedClass);
+			if (parameterizedType == null)
+				return false;
+		}
+		Type[] typeArguments = parameterizedType.getActualTypeArguments();
+		if(null != typeArguments && typeArguments.length >= 1 ){
+			Class<?> typeArgumentClass = (Class<?>) typeArguments[0]; 
+			return TypeUtils.isAssignable(typeArgumentClass, classParameterizedType);
+		}
+		return false;
+	}
+	
+	private static ParameterizedType extractParameterizedTypeFromClass(Class<?> parameterizedClass) {
+		Type genericSuperclass = parameterizedClass.getGenericSuperclass();
+		if (genericSuperclass instanceof ParameterizedType) {
+			return (ParameterizedType) genericSuperclass;
+		}
+		if (genericSuperclass != null) {
+			return extractParameterizedTypeFromClass((Class<?>) genericSuperclass);
+		}
+		return null;
+	}
+
+	private static ParameterizedType extractParameterizedTypeFromInterface(Class<?> parameterizedClass) {
+		Type[] genericInterfaces = parameterizedClass.getGenericInterfaces();
+		for (Type genericInterface : genericInterfaces) {
+			if (genericInterface instanceof ParameterizedType) {
+				return (ParameterizedType) genericInterface;
+			}
+			ParameterizedType parameterizedType = extractParameterizedTypeFromInterface((Class<?>) genericInterface);
+			if (parameterizedType != null) {
+				return parameterizedType;
+			}
+		}
+		return null;
+	}
 }

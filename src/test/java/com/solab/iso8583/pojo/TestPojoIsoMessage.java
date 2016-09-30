@@ -31,7 +31,7 @@ import com.solab.iso8583.parse.ConfigParser;
  * @author dilbertside
  *
  */
-@SuppressWarnings("deprecation")
+@SuppressWarnings({ "deprecation", "unused" })
 public class TestPojoIsoMessage {
 
 	protected final Logger log = LoggerFactory.getLogger(getClass());
@@ -46,7 +46,7 @@ public class TestPojoIsoMessage {
 	 */
 	@Before
 	public void setUp() throws Exception {
-		mf = ConfigParser.createFromPojo(NetworkMgmtRequest.class);
+		mf = ConfigParser.createFromPojo(NetworkMgmtRequest.class, AcquirerFinancialRequest.class);
 		mf.setCharacterEncoding(StandardCharsets.UTF_8.name());
 		mf.setUseBinaryMessages(false);
 		mf.setAssignDate(true);
@@ -60,14 +60,14 @@ public class TestPojoIsoMessage {
 	public void testNewMessage() {
 		IsoMessage iso = mf.newMessage(request);
 		Assert.assertEquals(0x800, iso.getType());
-        Assert.assertTrue(iso.hasEveryField(7, 11, 70));
-        Assert.assertEquals(IsoType.DATE10, iso.getField(7).getType());
-        Assert.assertEquals(IsoType.NUMERIC, iso.getField(11).getType());
-        Assert.assertEquals(IsoType.NUMERIC, iso.getField(70).getType());
-        Assert.assertEquals(systemTraceAuditNumber, iso.getObjectValue(11));
-        Assert.assertEquals(codeInformationNetwork, iso.getObjectValue(70));
-		
-        log.debug("testNewMessage\n {}", iso.debugString());
+    Assert.assertTrue(iso.hasEveryField(7, 11, 70));
+    Assert.assertEquals(IsoType.DATE10, iso.getField(7).getType());
+    Assert.assertEquals(IsoType.NUMERIC, iso.getField(11).getType());
+    Assert.assertEquals(IsoType.NUMERIC, iso.getField(70).getType());
+    Assert.assertEquals(systemTraceAuditNumber, iso.getObjectValue(11));
+    Assert.assertEquals(codeInformationNetwork, iso.getObjectValue(70));
+
+    log.debug("testNewMessage\n {}", iso.debugString());
 	}
 	
 	/**
@@ -79,24 +79,24 @@ public class TestPojoIsoMessage {
 		request.setSystemTraceAuditNumber(null);
 		IsoMessage iso = mf.newMessage(request);
 		Assert.assertEquals(0x800, iso.getType());
-        Assert.assertTrue(iso.hasEveryField(7, 11, 70));
-        Assert.assertEquals(IsoType.DATE10, iso.getField(7).getType());
-        Assert.assertEquals(IsoType.NUMERIC, iso.getField(11).getType());
-        Assert.assertEquals(IsoType.NUMERIC, iso.getField(70).getType());
-        
-        Assert.assertEquals(20, iso.getObjectValue(11));
-        Assert.assertEquals(codeInformationNetwork, iso.getObjectValue(70));
-        Date dt = iso.getObjectValue(7);
-        Assert.assertEquals(dateTransaction.getMonth(), dt.getMonth());
-        Assert.assertEquals(dateTransaction.getDay(), dt.getDay());
-        Assert.assertEquals(dateTransaction.getHours(), dt.getHours());
-        Assert.assertEquals(dateTransaction.getMinutes(), dt.getMinutes());
-        Assert.assertEquals(dateTransaction.getSeconds(), dt.getSeconds());
-        
-        
-        log.debug("testNewMessageAutoStan\n {}", iso.debugString());
-        
-        mf.setTraceNumberGenerator(null);
+    Assert.assertTrue(iso.hasEveryField(7, 11, 70));
+    Assert.assertEquals(IsoType.DATE10, iso.getField(7).getType());
+    Assert.assertEquals(IsoType.NUMERIC, iso.getField(11).getType());
+    Assert.assertEquals(IsoType.NUMERIC, iso.getField(70).getType());
+    
+    Assert.assertEquals(20, iso.getObjectValue(11));
+    Assert.assertEquals(codeInformationNetwork, iso.getObjectValue(70));
+    Date dt = iso.getObjectValue(7);
+    Assert.assertEquals(dateTransaction.getMonth(), dt.getMonth());
+    Assert.assertEquals(dateTransaction.getDay(), dt.getDay());
+    Assert.assertEquals(dateTransaction.getHours(), dt.getHours());
+    Assert.assertEquals(dateTransaction.getMinutes(), dt.getMinutes());
+    Assert.assertEquals(dateTransaction.getSeconds(), dt.getSeconds());
+    
+    
+    log.debug("testNewMessageAutoStan\n {}", iso.debugString());
+    
+    mf.setTraceNumberGenerator(null);
 	}
 	
 	/**
@@ -109,33 +109,33 @@ public class TestPojoIsoMessage {
 		//encode
 		IsoMessage iso = mf.newMessage(request);
 		Assert.assertEquals(0x800, iso.getType());
-        Assert.assertTrue(iso.hasEveryField(7, 11, 70));
-        Assert.assertEquals(IsoType.DATE10, iso.getField(7).getType());
-        Assert.assertEquals(IsoType.NUMERIC, iso.getField(11).getType());
-        Assert.assertEquals(IsoType.NUMERIC, iso.getField(70).getType());
-        Assert.assertEquals(systemTraceAuditNumber, iso.getObjectValue(11));
-        Assert.assertEquals(codeInformationNetwork, iso.getObjectValue(70));
-        Date dt = iso.getObjectValue(7);
-        Assert.assertEquals(dateTransaction.getMonth(), dt.getMonth());
-        Assert.assertEquals(dateTransaction.getDay(), dt.getDay());
-        Assert.assertEquals(dateTransaction.getHours(), dt.getHours());
-        Assert.assertEquals(dateTransaction.getMinutes(), dt.getMinutes());
-        Assert.assertEquals(dateTransaction.getSeconds(), dt.getSeconds());
-        
-        String isoStr = iso.debugString();
-        log.debug("testRoundTrip\n {}", isoStr);
-        
-        //decode
-        IsoMessage m = mf.parseMessage(isoStr.getBytes(), 0);
+    Assert.assertTrue(iso.hasEveryField(7, 11, 70));
+    Assert.assertEquals(IsoType.DATE10, iso.getField(7).getType());
+    Assert.assertEquals(IsoType.NUMERIC, iso.getField(11).getType());
+    Assert.assertEquals(IsoType.NUMERIC, iso.getField(70).getType());
+    Assert.assertEquals(systemTraceAuditNumber, iso.getObjectValue(11));
+    Assert.assertEquals(codeInformationNetwork, iso.getObjectValue(70));
+    Date dt = iso.getObjectValue(7);
+    Assert.assertEquals(dateTransaction.getMonth(), dt.getMonth());
+    Assert.assertEquals(dateTransaction.getDay(), dt.getDay());
+    Assert.assertEquals(dateTransaction.getHours(), dt.getHours());
+    Assert.assertEquals(dateTransaction.getMinutes(), dt.getMinutes());
+    Assert.assertEquals(dateTransaction.getSeconds(), dt.getSeconds());
+    
+    String isoStr = iso.debugString();
+    log.debug("testRoundTrip\n {}", isoStr);
+    
+    //decode
+    IsoMessage m = mf.parseMessage(isoStr.getBytes(), 0);
 		NetworkMgmtRequest nmr = mf.parseMessage(m, NetworkMgmtRequest.class);
 		Assert.assertEquals(request.getCodeInformationNetwork(), nmr.getCodeInformationNetwork());
-        Assert.assertEquals(request.getDateTransaction().getMonth(), nmr.getDateTransaction().getMonth());
-        //IsoType.DATE10 is year insensitive, we need to set the year otherwise week day number will be wrong
-        nmr.getDateTransaction().setYear(request.getDateTransaction().getYear());
-        Assert.assertEquals(request.getDateTransaction().getDay(), nmr.getDateTransaction().getDay());
-        Assert.assertEquals(request.getDateTransaction().getHours(), nmr.getDateTransaction().getHours());
-        Assert.assertEquals(request.getDateTransaction().getMinutes(), nmr.getDateTransaction().getMinutes());
-        Assert.assertEquals(request.getDateTransaction().getSeconds(), nmr.getDateTransaction().getSeconds());
+    Assert.assertEquals(request.getDateTransaction().getMonth(), nmr.getDateTransaction().getMonth());
+    //IsoType.DATE10 is year insensitive, we need to set the year otherwise week day number will be wrong
+    nmr.getDateTransaction().setYear(request.getDateTransaction().getYear());
+    Assert.assertEquals(request.getDateTransaction().getDay(), nmr.getDateTransaction().getDay());
+    Assert.assertEquals(request.getDateTransaction().getHours(), nmr.getDateTransaction().getHours());
+    Assert.assertEquals(request.getDateTransaction().getMinutes(), nmr.getDateTransaction().getMinutes());
+    Assert.assertEquals(request.getDateTransaction().getSeconds(), nmr.getDateTransaction().getSeconds());
 		Assert.assertEquals(request.getSystemTraceAuditNumber(), nmr.getSystemTraceAuditNumber());
 	}
 
@@ -151,5 +151,70 @@ public class TestPojoIsoMessage {
 	@Test(expected=IllegalArgumentException.class)
 	public void testNewMessageNotRegistered(){
 		mf.newMessage(new NotRegisteredPojo());
+	}
+	
+	/**
+	 * Test method for {@link com.solab.iso8583.MessageFactory#newMessage(Object)}.
+	 */
+	@Test
+	public void testNewMessageAcquirerFinancialRequest() {
+		AcquirerFinancialRequest request = new AcquirerFinancialRequest();
+		request.setSystemTraceAuditNumber(systemTraceAuditNumber);
+		request.setReservedNational("hello world!");
+		//make it!!
+		IsoMessage iso = mf.newMessage(request);
+		
+		Assert.assertEquals(0x200, iso.getType());
+	    Assert.assertTrue(iso.hasEveryField(3,7,11,28,32,35,43,47,48,49,60,61,100,102));
+	    
+	    Assert.assertEquals(IsoType.NUMERIC, iso.getField(3).getType());
+	    Assert.assertEquals(request.getProcessingCode(), iso.getObjectValue(3));
+	    
+	    //IsoType.DATE10 is year insensitive
+	    Assert.assertEquals(IsoType.DATE10, iso.getField(7).getType());
+	    Date dt = (Date) iso.getField(7).getValue(); dt.setYear(2000);
+	    Assert.assertEquals(request.getDateTransaction(), dt);
+	    
+	    Assert.assertEquals(IsoType.NUMERIC, iso.getField(11).getType());
+	    Assert.assertEquals(systemTraceAuditNumber, iso.getObjectValue(11));
+	    
+	    //check acquiringInstitutionIdentificationCode
+	    Assert.assertEquals(IsoType.LLVAR, iso.getField(32).getType());
+	    Assert.assertEquals(request.getAcquiringInstitutionIdentificationCode(), iso.getObjectValue(32));
+	    
+	    Assert.assertEquals(IsoType.LLVAR, iso.getField(35).getType());
+	    Assert.assertEquals(request.getTrack2Data(), iso.getObjectValue(35));
+	    
+	    Assert.assertEquals(IsoType.ALPHA, iso.getField(43).getType());
+	    Assert.assertEquals(request.getCardAcceptorName(), iso.getObjectValue(43));
+	    
+	    //here we go the nested pojo
+	    Assert.assertEquals(IsoType.LLLVAR, iso.getField(48).getType());
+	    log.debug("nested pojo\n {}", iso.getObjectValue(48));
+	    //Assert.assertEquals(request.getAdditionalData(), iso.getObjectValue(48));
+	    
+	    Assert.assertEquals(IsoType.ALPHA, iso.getField(49).getType());
+	    Assert.assertEquals(request.getCurrencyCodeTransaction(), iso.getObjectValue(49));
+	    
+	    Assert.assertEquals(IsoType.LLLVAR, iso.getField(60).getType());
+	    Assert.assertEquals(request.getReservedNational(), iso.getObjectValue(60));
+	    
+	    Assert.assertEquals(IsoType.LLLVAR, iso.getField(61).getType());
+	    Assert.assertEquals(request.getReservedPrivate(), iso.getObjectValue(61));
+	    
+	    Assert.assertEquals(IsoType.LLVAR, iso.getField(100).getType());
+	    Assert.assertEquals(request.getReceivingInstitutionIdentificationCode(), iso.getObjectValue(100));
+	    
+	    Assert.assertEquals(IsoType.LLVAR, iso.getField(102).getType());
+	    Assert.assertEquals(request.getAccountIdentification1(), iso.getObjectValue(102));
+	    
+	    /*Assert.assertEquals(IsoType., iso.getField().getType());
+	    Assert.assertEquals(request.get, iso.getObjectValue());*/
+	    
+	    
+	    //Assert.assertEquals(IsoType.NUMERIC, iso.getField(70).getType());
+	    //here we are very interested if our nested field was set 
+	
+	    log.debug("testNewMessageAcquirerFinancialRequest\n {}", iso.debugString());
 	}
 }

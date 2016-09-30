@@ -5,15 +5,23 @@ package com.solab.iso8583;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.math.NumberUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.math.NumberUtils;
 
 import com.solab.iso8583.annotation.Iso8583Field;
+import com.solab.iso8583.codecs.CompositeField;
 
 /**
  * Represents the definition of a field from a pojo annotated property
- * @author lch
+ * @author dilbertside
  *
  */
 public class IsoField<T extends Object> {
@@ -50,6 +58,18 @@ public class IsoField<T extends Object> {
 	 * http://stackoverflow.com/questions/75175/create-instance-of-generic-type-in-java
 	 */
 	Class<T> fieldClass;
+	
+	/**
+	 * map retaining the list of nested fields retaining all properties definition of private or national reserved fields<br>
+	 * Key is the  {@link #propertyName}<br>
+	 * Value is the list of all properties composing this pojo object<br>
+	 * it's filled while registration by detecting properties annotated with {@link Iso8583Field}<br>
+	 * Please note in this sub-pojo, index does not have the same meaning as Iso8583 message template 
+	 *  
+	 */
+	Map<String, Set<IsoField<?>>> mapNestedField = null;
+	
+	boolean custom = false;
 
 	/**
 	 * @param index
@@ -274,98 +294,36 @@ public class IsoField<T extends Object> {
 	public Class<T> getFieldClass() {
 		return fieldClass;
 	}
-
+	
 	/**
 	 * @param fieldClass the fieldClass to set
 	 */
 	public void setFieldClass(Class<T> fieldClass) {
 		this.fieldClass = fieldClass;
 	}
-
+	
 	/* (non-Javadoc)
 	 * @see java.lang.Object#hashCode()
 	 */
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + index;
-		result = prime * result + ((isoType == null) ? 0 : isoType.hashCode());
-		result = prime * result + length;
-		result = prime * result + ((name == null) ? 0 : name.hashCode());
-		result = prime * result + ((propertyName == null) ? 0 : propertyName.hashCode());
-		result = prime * result + ((fieldClass == null) ? 0 : fieldClass.hashCode());
-		return result;
+		return HashCodeBuilder.reflectionHashCode(this);
 	}
-
+	
 	/* (non-Javadoc)
 	 * @see java.lang.Object#equals(java.lang.Object)
 	 */
 	@Override
 	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		IsoField<?> other = (IsoField<?>) obj;
-		if (index != other.index)
-			return false;
-		if (isoType != other.isoType)
-			return false;
-		if (length != other.length)
-			return false;
-		if (name == null) {
-			if (other.name != null)
-				return false;
-		} else if (!name.equals(other.name))
-			return false;
-		if (propertyName == null) {
-			if (other.propertyName != null)
-				return false;
-		} else if (!propertyName.equals(other.propertyName))
-			return false;
-		if (fieldClass == null) {
-			if (other.fieldClass != null)
-				return false;
-		} else if (!fieldClass.equals(other.fieldClass))
-			return false;
-		return true;
+		return EqualsBuilder.reflectionEquals(this, obj);
 	}
-
+	
 	/* (non-Javadoc)
 	 * @see java.lang.Object#toString()
 	 */
 	@Override
 	public String toString() {
-		StringBuilder builder = new StringBuilder();
-		builder.append("IsoField [index=");
-		builder.append(index);
-		builder.append(", length=");
-		builder.append(length);
-		builder.append(", ");
-		if (isoType != null) {
-			builder.append("isoType=");
-			builder.append(isoType);
-			builder.append(", ");
-		}
-		if (name != null) {
-			builder.append("name=");
-			builder.append(name);
-			builder.append(", ");
-		}
-		if (propertyName != null) {
-			builder.append("propertyName=");
-			builder.append(propertyName);
-			builder.append(", ");
-		}
-		if (fieldClass != null) {
-			builder.append("fieldClass=");
-			builder.append(fieldClass);
-		}
-		builder.append("]");
-		return builder.toString();
+		return ToStringBuilder.reflectionToString(this);
 	}
 	
 	/**
@@ -392,18 +350,140 @@ public class IsoField<T extends Object> {
 		}
 	}//class NumberCustomField 
 	
-	public static class AmountCustomField implements CustomField<Number>{
+	public static class AmountCustomField implements CustomField<BigDecimal>{
 		@Override
-		public Number decodeField(String value) {
+		public BigDecimal decodeField(String value) {
 			if(StringUtils.isNotBlank(value))
-				return NumberUtils.createNumber(value.replaceAll("\\D+", "").trim());
+				return NumberUtils.createBigDecimal(value.replaceAll("\\D+", "").trim());
 			return null;
 		}
 		@Override
-		public String encodeField(Number value) {
+		public String encodeField(BigDecimal value) {
 			if(null != value)
 				return value.toString();
 			return "";
 		}
-	}//class NumberCustomField 
+	}//class AmountCustomField 
+
+	/**
+	 * default CustomField encoder when a sub-field is defined in the ISO message<br>
+	 * This default implementation does nothing, and is not encoding aware
+	 */
+	public static class DefaultCustomStringField implements CustomBinaryField<String>{
+		@Override
+		public String decodeField(String value) {
+			return value;
+		}
+		@Override
+		public String encodeField(String value) {
+			return value;
+		}
+		@Override
+		public String decodeBinaryField(byte[] value, int offset, int length) {
+			return null != value ? new String(value) : null;
+		}
+		@Override
+		public byte[] encodeBinaryField(String value) {
+			return null != value ? value.getBytes() : null;
+		}
+	}//class DefaultCustomStringField 
+	
+	/**
+	 * default CustomField encoder when a sub-field is defined in the ISO message<br>
+	 * This default implementation does nothing, and is not encoding aware
+	 */
+	public static class DefaultCustomByteField implements CustomBinaryField<byte[]>{
+		@Override
+		public byte[] decodeField(String value) {
+			return value.getBytes();
+		}
+		@Override
+		public String encodeField(byte[] value) {
+			return null != value ? new String(value) : null;
+		}
+		@Override
+		public byte[] decodeBinaryField(byte[] value, int offset, int length) {
+			return value;
+		}
+		@Override
+		public byte[] encodeBinaryField(byte[] value) {
+			return value;
+		}
+	}//class DefaultCustomByteField 
+
+	/**
+	 * @return the mapNestedField
+	 */
+	public Map<String, Set<IsoField<?>>> getMapNestedField() {
+		if(null == mapNestedField)
+			mapNestedField = new HashMap<>();
+		return mapNestedField;
+	}
+	
+	/**
+	 * retrieve a list of all nested fields
+	 * @param key primary template field name
+	 * @param HashSet never null 
+	 */
+	public Set<IsoField<?>> getAllNestedField(String key) {
+		if (StringUtils.isNotBlank(key) && getMapNestedField().containsKey(key))
+			return getMapNestedField().get(key);
+		return new HashSet<>();
+	}
+	/**
+	 * add a nested field to primary template field
+	 * @param key primary template field name
+	 * @param nestedIsoField nested IsoField 
+	 */
+	public void addNestedField(String key, IsoField<?> nestedIsoField) {
+		if(getMapNestedField().containsKey(key)){
+			mapNestedField.get(key).add(nestedIsoField);
+		}else{
+			Set<IsoField<?>> set = new HashSet<>();
+			set.add(nestedIsoField);
+			mapNestedField.put(key, set);
+		}
+	}
+	
+	/**
+	 * @param mapNestedField the mapNestedField to set
+	 */
+	public void setMapNestedField(Map<String, Set<IsoField<?>>> mapNestedField) {
+		this.mapNestedField = mapNestedField;
+	}
+
+	public boolean isNested() {
+		return this.mapNestedField != null;
+	}
+	
+	public static class CompositeFieldPojo extends CompositeField{
+
+		/**
+		 * 
+		 * @param idx base 1
+		 * @param isoValue 
+		 * @return
+		 */
+		public CompositeFieldPojo setField(int idx, IsoValue<?> isoValue) {
+			getValues().set(idx-1, isoValue);
+			return this;
+		}
+		
+	}
+
+	/**
+	 * @return the custom
+	 */
+	public boolean isCustom() {
+		return custom;
+	}
+
+	/**
+	 * @param custom the custom to set
+	 * @return IsoField for convenience chaining
+	 */
+	public IsoField<?> setCustom(boolean custom) {
+		this.custom = custom;
+		return this;
+	}
 }
