@@ -32,6 +32,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import com.solab.iso8583.*;
+import com.solab.iso8583.IsoField.CompositeFieldPojo;
 import com.solab.iso8583.codecs.CompositeField;
 import com.solab.iso8583.util.HexCodec;
 import org.slf4j.Logger;
@@ -504,7 +505,18 @@ public class ConfigParser {
 	protected static <T extends IsoMessage> void parseGuides(final T isoMessage, final MessageFactory<T> mfact) {
 		HashMap<Integer, FieldParseInfo> parseMap = new HashMap<>();
 		for (int indexField : isoMessage.getAllFields()) {
-			FieldParseInfo fieldParseInfo = getParser(isoMessage.getField(indexField), mfact);
+			IsoValue<?> isoValue =  isoMessage.getField(indexField);
+			FieldParseInfo fieldParseInfo = null;
+			if(null != isoValue.getEncoder()){//nested field or custom field
+				if(isoValue.getEncoder() instanceof CompositeFieldPojo){
+					final CompositeFieldPojo combo = (CompositeFieldPojo) isoValue.getEncoder();
+					for (IsoValue<?> isoValue2 : combo.getValues()) {
+						combo.addParser(getParser(isoValue2, mfact));
+					}
+				}
+			}else{
+			}
+			fieldParseInfo = getParser(isoValue, mfact);
 			parseMap.put(indexField, fieldParseInfo);
 		}
 		mfact.setParseMap(isoMessage.getType(), parseMap);

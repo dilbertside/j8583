@@ -18,6 +18,7 @@ import org.apache.commons.lang3.math.NumberUtils;
 
 import com.solab.iso8583.annotation.Iso8583Field;
 import com.solab.iso8583.codecs.CompositeField;
+import com.solab.iso8583.util.PojoUtils;
 
 /**
  * Represents the definition of a field from a pojo annotated property
@@ -197,97 +198,34 @@ public class IsoField<T extends Object> {
 	 * used with pojo dynamic instantiation<br>
 	 * cast an IsoValue to pojo field target type
 	 * @param isoValue {@link IsoValue}
-	 * @return null if param null or IsoValue null
+	 * @return <code>null</code> if parameter is <code>null</code> or IsoValue <code>null</code>
+	 * @throws ClassCastException
+	 */
+	public T getValueSafeCast(IsoValue<?> isoValue) throws ClassCastException {
+		return getValueSafeCast(isoValue, fieldClass);
+	}
+	
+	/**
+	 * used with pojo dynamic instantiation<br>
+	 * cast an IsoValue to a field target type
+	 * @param isoValue {@link IsoValue}
+	 * @param fieldClass the target type which the value will be cast to
+	 * @return <code>null</code> if parameter is <code>null</code> or IsoValue <code>null</code>
 	 * @throws ClassCastException
 	 */
 	@SuppressWarnings("unchecked")
-	public T getValueSafeCast(IsoValue<?> isoValue) throws ClassCastException {
+	public static <T> T getValueSafeCast(IsoValue<?> isoValue, Class<T> fieldClass) throws ClassCastException {
 		if(null != isoValue){
 			if(null != isoValue.getEncoder()){
 				return (T) isoValue.getEncoder().decodeField(isoValue.getValue().toString());
 			}
 			if(isoValue.getType() == IsoType.NUMERIC)
-				return convertNumberToTargetClass((Number)isoValue.getValue(), fieldClass);
+				return PojoUtils.convertNumberToTargetClass((Number)isoValue.getValue(), fieldClass);
 			return fieldClass.cast(isoValue.getValue());
 		}
 		return null;
 	}
 
-	/**
-	 * Convert the given number into an instance of the given target class.
-	 * @param number the number to convert
-	 * @param targetClass the target class to convert to
-	 * @return the converted number
-	 * @throws IllegalArgumentException if the target class is not supported
-	 * (i.e. not a standard Number subclass as included in the JDK)
-	 * @see java.lang.Byte
-	 * @see java.lang.Short
-	 * @see java.lang.Integer
-	 * @see java.lang.Long
-	 * @see java.math.BigInteger
-	 * @see java.lang.Float
-	 * @see java.lang.Double
-	 * @see java.math.BigDecimal
-	 */
-	@SuppressWarnings({ "unchecked", "hiding" })
-	public <T> T convertNumberToTargetClass(Number number, Class<T> targetClass)
-			throws IllegalArgumentException {
-
-		assert null != number: "Number must not be null";
-		assert null != targetClass : "Target class must not be null";
-
-		if (targetClass.isInstance(number)) {
-			return (T) number;
-		}
-		else if (Byte.class == targetClass) {
-			byte value = number.byteValue();
-			if (value < Byte.MIN_VALUE || value > Byte.MAX_VALUE) {
-				throw new IllegalArgumentException(String.format("Could not convert number [%d] of type [%s] to target class [%s]: overflow", number, number.getClass().getName(), targetClass.getName()));
-			}
-			return (T) Byte.valueOf(number.byteValue());
-		}
-		else if (Short.class == targetClass) {
-			short value = number.shortValue();
-			if (value < Short.MIN_VALUE || value > Short.MAX_VALUE) {
-				throw new IllegalArgumentException(String.format("Could not convert number [%d] of type [%s] to target class [%s]: overflow", number, number.getClass().getName(), targetClass.getName()));
-			}
-			return (T) Short.valueOf(number.shortValue());
-		}
-		else if (Integer.class == targetClass) {
-			long value = number.intValue();
-			if (value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) {
-				throw new IllegalArgumentException(String.format("Could not convert number [%d] of type [%s] to target class [%s]: overflow", number, number.getClass().getName(), targetClass.getName()));
-			}
-			return (T) Integer.valueOf(number.intValue());
-		}
-		else if (Long.class == targetClass) {
-			long value = number.longValue();
-			return (T) Long.valueOf(value);
-		}
-		else if (BigInteger.class == targetClass) {
-			if (number instanceof BigDecimal) {
-				// do not lose precision - use BigDecimal's own conversion
-				return (T) ((BigDecimal) number).toBigInteger();
-			} else {
-				// original value is not a Big* number - use standard long conversion
-				return (T) BigInteger.valueOf(number.longValue());
-			}
-		}
-		else if (Float.class == targetClass) {
-			return (T) Float.valueOf(number.floatValue());
-		}
-		else if (Double.class == targetClass) {
-			return (T) Double.valueOf(number.doubleValue());
-		}
-		else if (BigDecimal.class == targetClass) {
-			// always use BigDecimal(String) here to avoid unpredictability of BigDecimal(double)
-			// (see BigDecimal javadoc for details)
-			return (T) new BigDecimal(number.toString());
-		}
-		else {
-			throw new IllegalArgumentException(String.format("Could not convert number [%d] of type [%s] to target class [%s]: overflow", number, number.getClass().getName(), targetClass.getName()));
-		}
-	}
 	/**
 	 * @return the fieldClass
 	 */
@@ -459,14 +397,24 @@ public class IsoField<T extends Object> {
 	public static class CompositeFieldPojo extends CompositeField{
 
 		/**
-		 * 
+		 * set an {@link IsoValue} to a field index
 		 * @param idx base 1
 		 * @param isoValue 
 		 * @return
 		 */
 		public CompositeFieldPojo setField(int idx, IsoValue<?> isoValue) {
+			assert idx > 0 : "index is in Base 1";
 			getValues().set(idx-1, isoValue);
 			return this;
+		}
+		
+		/**
+		 * retrieve a field by index
+		 * @param idx index base 1
+		 */
+		public IsoValue<?> getField(int idx){
+			assert idx > 0 : "index is in Base 1";
+			return getValues().get(idx-1);
 		}
 		
 	}

@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
 import com.solab.iso8583.IsoField.CompositeFieldPojo;
 import com.solab.iso8583.annotation.Iso8583;
 import com.solab.iso8583.annotation.Iso8583Field;
-import com.solab.iso8583.codecs.CompositeField;
 import com.solab.iso8583.parse.ConfigParser;
 import com.solab.iso8583.parse.FieldParseInfo;
 import com.solab.iso8583.util.PojoUtils;
@@ -764,7 +763,7 @@ public class MessageFactory<T extends IsoMessage> {
 					}
 				}else if(iso8583Field.customField()){
 					isoField.setCustom(true);
-					CompositeField compositeField = new CompositeField();
+					CompositeFieldPojo compositeField = new CompositeFieldPojo();
 					CustomBinaryField<?> customBinaryField = null;
 					try {
 						customBinaryField = iso8583Field.customFieldMapper().newInstance();
@@ -776,6 +775,7 @@ public class MessageFactory<T extends IsoMessage> {
 					IsoValue<?> isoValue = buildIsoField(isoField, isoField.getFieldClass(), customBinaryField);
 					compositeField.addValue(isoValue);
 					isoMessageTemplate.setField(iso8583Field.index(), new IsoValue<>(isoField.getIsoType(), isoField.getLength(), compositeField));
+					setCustomField(iso8583Field.index(), customBinaryField);
 				} else {
 					if(!nested)
 						defineField(isoField, field.getType(), isoMessageTemplate);
@@ -839,23 +839,29 @@ public class MessageFactory<T extends IsoMessage> {
 						CompositeFieldPojo compositeField = (CompositeFieldPojo) objectCompositeField; 
 						for (IsoField<?> nestedIsoField : isoField.getAllNestedField(isoField.getPropertyName())) {
 							Object nestedValue = PojoUtils.readField(value, nestedIsoField.getPropertyName(), nestedIsoField.getFieldClass());
-							compositeField.setField(nestedIsoField.index, new IsoValue<>(nestedIsoField.getIsoType(), nestedValue, nestedIsoField.length));
+							compositeField.setField(nestedIsoField.index, 
+									new IsoValue<>(nestedIsoField.getIsoType(), nestedValue, nestedIsoField.length));
 						}
 						isoMessage.setValue(isoField.index, compositeField, compositeField, isoField.getIsoType(), isoField.length);
 					}
 						
 				} else if(isoField.isCustom()){
+					//shaky do not have a serious use case for moment
 					Object objectCompositeField = isoMessage.getField(isoField.index).getEncoder();
-					if(objectCompositeField instanceof CompositeField){
-						CompositeField compositeField = (CompositeField) objectCompositeField;
+					if(objectCompositeField instanceof CompositeFieldPojo){
+						//DefaultCustomStringField
+						CompositeFieldPojo compositeField = (CompositeFieldPojo) objectCompositeField;
+						if(isoMessage.isBinary()){
+							compositeField.setField(1, new IsoValue<>(isoField.getIsoType(), value == null ? new byte[0] : value, isoField.length/*, (CustomField)objectCompositeField*/));
+						}else{
+							compositeField.setField(1, new IsoValue<>(isoField.getIsoType(), value == null ? "" : value, isoField.length/*,(CustomField)objectCompositeField*/));
+						}
 						isoMessage.setValue(isoField.index, compositeField, compositeField, isoField.getIsoType(), isoField.length);
 					}
 						
 				}else{
-					isoMessage.setField(isoField.index,
-							new IsoValue<>(isoField.getIsoType(),
-									value,
-									isoField.length));
+					isoMessage.setField(isoField.index, 
+							new IsoValue<>(isoField.getIsoType(), value, isoField.length));
 				}
 			}
 			return isoMessage;
@@ -950,11 +956,31 @@ public class MessageFactory<T extends IsoMessage> {
 								isoMessage.getType(), clazz.getSimpleName()));
 			Map<Integer, IsoField<?>> isoFields = templateIsoFieldsMap.get(templateType);
 			for (Entry<Integer, IsoField<?>> entry : isoFields.entrySet()) {
-				String propName = entry.getValue().getPropertyName();
-				if (isoMessage.hasField(entry.getValue().getIndex())) {
-					IsoValue<?> isoValue = isoMessage.getField(entry.getValue().getIndex());
-					Object value = entry.getValue().getValueSafeCast(isoValue);
-					PojoUtils.writeField(instance, propName, entry.getValue().getFieldClass(), value);
+				IsoField<?> isoField = entry.getValue();
+				String propName = isoField.getPropertyName();
+				if (isoMessage.hasField(isoField.getIndex())) {
+					IsoValue<?> isoValue = isoMessage.getField(isoField.getIndex());
+					if(isoField.isCustom()){
+						Object objectCompositeField = isoMessage.getField(isoField.index).getEncoder();
+						if(objectCompositeField instanceof CompositeFieldPojo){
+							CompositeFieldPojo compositeField = (CompositeFieldPojo) objectCompositeField; 
+							Object customValue = isoField.getValueSafeCast(compositeField.getField(1));
+							PojoUtils.writeField(instance, isoField.getPropertyName(), isoField.getFieldClass(), customValue);
+						}
+					} else if(isoField.isNested()){
+						Object objectCompositeField = isoMessage.getField(isoField.index).getEncoder();
+						if(objectCompositeField instanceof CompositeFieldPojo){
+							Object nestedInstance = isoField.getFieldClass().newInstance();//beware pojo must provide a default no-arg constructor
+							CompositeFieldPojo compositeField = (CompositeFieldPojo) objectCompositeField; 
+							for (IsoField<?> nestedIsoField : isoField.getAllNestedField(isoField.getPropertyName())) {
+								Object nestedValue = nestedIsoField.getValueSafeCast(compositeField.getField(nestedIsoField.index));
+								PojoUtils.writeField(nestedInstance, nestedIsoField.getPropertyName(), nestedIsoField.getFieldClass(), nestedValue);
+							}
+						}
+					} else {
+						Object value = isoField.getValueSafeCast(isoValue);
+						PojoUtils.writeField(instance, propName, isoField.getFieldClass(), value);
+					}
 				}
 			}
 		} catch (InstantiationException | IllegalAccessException e) {

@@ -9,6 +9,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -213,5 +215,81 @@ public class PojoUtils {
 			}
 		}
 		return null;
+	}
+	
+	/**
+	 * Convert the given number into an instance of the given target class.
+	 * @param number the number to convert
+	 * @param targetClass the target class to convert to
+	 * @return the converted number
+	 * @throws IllegalArgumentException if the target class is not supported
+	 * (i.e. not a standard Number subclass as included in the JDK)
+	 * @see java.lang.Byte
+	 * @see java.lang.Short
+	 * @see java.lang.Integer
+	 * @see java.lang.Long
+	 * @see java.math.BigInteger
+	 * @see java.lang.Float
+	 * @see java.lang.Double
+	 * @see java.math.BigDecimal
+	 */
+	@SuppressWarnings({ "unchecked" })
+	public static <T> T convertNumberToTargetClass(Number number, Class<T> targetClass)
+			throws IllegalArgumentException {
+
+		assert null != number: "Number must not be null";
+		assert null != targetClass : "Target class must not be null";
+
+		if (targetClass.isInstance(number)) {
+			return (T) number;
+		}
+		else if (Byte.class == targetClass) {
+			byte value = number.byteValue();
+			if (value < Byte.MIN_VALUE || value > Byte.MAX_VALUE) {
+				throw new IllegalArgumentException(String.format("Could not convert number [%d] of type [%s] to target class [%s]: overflow", number, number.getClass().getName(), targetClass.getName()));
+			}
+			return (T) Byte.valueOf(number.byteValue());
+		}
+		else if (Short.class == targetClass) {
+			short value = number.shortValue();
+			if (value < Short.MIN_VALUE || value > Short.MAX_VALUE) {
+				throw new IllegalArgumentException(String.format("Could not convert number [%d] of type [%s] to target class [%s]: overflow", number, number.getClass().getName(), targetClass.getName()));
+			}
+			return (T) Short.valueOf(number.shortValue());
+		}
+		else if (Integer.class == targetClass) {
+			long value = number.intValue();
+			if (value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) {
+				throw new IllegalArgumentException(String.format("Could not convert number [%d] of type [%s] to target class [%s]: overflow", number, number.getClass().getName(), targetClass.getName()));
+			}
+			return (T) Integer.valueOf(number.intValue());
+		}
+		else if (Long.class == targetClass) {
+			long value = number.longValue();
+			return (T) Long.valueOf(value);
+		}
+		else if (BigInteger.class == targetClass) {
+			if (number instanceof BigDecimal) {
+				// do not lose precision - use BigDecimal's own conversion
+				return (T) ((BigDecimal) number).toBigInteger();
+			} else {
+				// original value is not a Big* number - use standard long conversion
+				return (T) BigInteger.valueOf(number.longValue());
+			}
+		}
+		else if (Float.class == targetClass) {
+			return (T) Float.valueOf(number.floatValue());
+		}
+		else if (Double.class == targetClass) {
+			return (T) Double.valueOf(number.doubleValue());
+		}
+		else if (BigDecimal.class == targetClass) {
+			// always use BigDecimal(String) here to avoid unpredictability of BigDecimal(double)
+			// (see BigDecimal javadoc for details)
+			return (T) new BigDecimal(number.toString());
+		}
+		else {
+			throw new IllegalArgumentException(String.format("Could not convert number [%d] of type [%s] to target class [%s]: overflow", number, number.getClass().getName(), targetClass.getName()));
+		}
 	}
 }

@@ -124,14 +124,14 @@ public class AbstractMessage implements Serializable{
     
     //Card acceptor name/location (1-23 address 24-36 city 37-38 state 39-40 country)
     @Iso8583Field(index=43, type=IsoType.ALPHA, length=40)
-    protected String cardAcceptorName= "Fixed-width data";
+    protected String cardAcceptorName= "Fixed-width data                        ";
     
     //national
-    @Iso8583Field(index=47, type=IsoType.LLLVAR, length=999, customField=true, customFieldMapper= DefaultCustomStringField.class)
+    @Iso8583Field(index=47, type=IsoType.LLLVAR, customField=true, customFieldMapper= DefaultCustomStringField.class)
     protected String additionalDataNational;
     
     //private
-    @Iso8583Field(index=48, type=IsoType.LLLVAR, length=999, nestedField=true)
+    @Iso8583Field(index=48, type=IsoType.LLLVAR, nestedField=true)
     protected PrivateData additionalData = new PrivateData();
     
     @Iso8583Field(index=49, type=IsoType.ALPHA, length=3)

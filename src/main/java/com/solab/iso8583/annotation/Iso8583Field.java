@@ -34,7 +34,8 @@ public @interface Iso8583Field {
 	public IsoType type() default IsoType.ALPHA;
 
 	/**
-	 * used with {@link com.solab.iso8583.IsoType#NUMERIC}
+	 * used with {@link com.solab.iso8583.IsoType#NUMERIC}<br>
+	 * Do NOT set for other Iso type, except if will be a fixed length. validation will be made while parsing frames
 	 */
 	public int length() default 0;
 	
