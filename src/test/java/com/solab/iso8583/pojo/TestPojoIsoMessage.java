@@ -194,9 +194,10 @@ public class TestPojoIsoMessage {
 	    
 	    Assert.assertEquals(IsoType.LLLVAR, iso.getField(47).getType());
 	    log.debug("nested pojo\n {}", iso.getObjectValue(47));
-	    Assert.assertTrue("must be of type CompositeFieldPojo", iso.getObjectValue(47) instanceof CompositeFieldPojo);
-	    CompositeFieldPojo cf = iso.getObjectValue(47);
-	    Assert.assertEquals(request.getAdditionalDataNational(), cf.getField(1).getValue());
+	    //Assert.assertTrue("must be of type CompositeFieldPojo", iso.getObjectValue(47) instanceof CompositeFieldPojo);
+	    //CompositeFieldPojo cf = iso.getObjectValue(47);
+	    //Assert.assertEquals(request.getAdditionalDataNational(), cf.getField(1).getValue());
+	    Assert.assertEquals(request.getAdditionalDataNational(), iso.getObjectValue(47));
 	    
 	    //here we go the nested pojo
 	    Assert.assertEquals(IsoType.LLLVAR, iso.getField(48).getType());

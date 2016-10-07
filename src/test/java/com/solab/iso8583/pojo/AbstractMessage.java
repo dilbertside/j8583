@@ -5,10 +5,13 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.GregorianCalendar;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.math.NumberUtils;
 
+import com.solab.iso8583.CustomBinaryField;
 import com.solab.iso8583.IsoType;
 import com.solab.iso8583.IsoField.DefaultCustomStringField;
 import com.solab.iso8583.annotation.Iso8583Field;
@@ -28,9 +31,9 @@ public class AbstractMessage implements Serializable{
 	
 	public static class PrivateData implements Serializable{
 		
-		private static final long serialVersionUID = 5863255007081836317L;
+	private static final long serialVersionUID = 5863255007081836317L;
 
-		@Iso8583Field(index=1, type=IsoType.ALPHA, length=40)
+	@Iso8583Field(index=1, type=IsoType.ALPHA, length=40)
   	protected String privateDataStr = "Life, the Universe, and Everything";
   	
   	@Iso8583Field(index=2, type=IsoType.NUMERIC, length=2)
@@ -104,8 +107,81 @@ public class AbstractMessage implements Serializable{
   }
 
 		
-	@Iso8583Field(index=3, type=IsoType.NUMERIC, length=6)
-	protected Integer processingCode = 650000;
+	
+	public enum ProcessingCode{
+
+		none(0, "None"),
+		yes(1000, "YES"),
+		no(2000, "NO"),
+		maybe(3000, "MAYBE");
+		
+		final private int code;
+		final private String label;
+		
+		ProcessingCode(int code, String label){
+			this.code =code;
+			this.label = label;
+		}
+		/**
+		 * @return the code
+		 */
+		public int getCode() {
+			return code;
+		}
+		/**
+		 * @return the label
+		 */
+		public String getLabel() {
+			return label;
+		}
+
+		public ProcessingCode searchCode(int code){
+			for (ProcessingCode processingCode : ProcessingCode.values()) {
+				if(processingCode.getCode() == code)
+					return processingCode;
+			}
+			return none;
+		}
+		
+		public String toString(){
+			return getLabel();
+		}
+
+	}
+	
+	public static class EnumProcessingCodeCustomField implements CustomBinaryField<ProcessingCode>{
+		
+		/**
+		 * work around, java spec http://docs.oracle.com/javase/specs/jls/se7/html/jls-8.html#jls-8.9
+		 * 
+		 * @param value enum to build from String
+		 * @return
+		 */
+		@Override
+		public ProcessingCode decodeField(String value) {
+			if(StringUtils.isBlank(value))
+				return ProcessingCode.none;
+			return ProcessingCode.none.searchCode(NumberUtils.createNumber(value).intValue());
+		}
+		
+		@Override
+		public String encodeField(ProcessingCode value) {
+			return new StringBuilder(value.code).toString();
+		}
+
+		@Override
+		public ProcessingCode decodeBinaryField(byte[] value, int offset, int length) {
+			return decodeField(new String(value));
+		}
+
+		@Override
+		public byte[] encodeBinaryField(ProcessingCode value) {
+			return encodeField(value).getBytes();
+		}
+	}
+	
+	@Iso8583Field(index=3, type=IsoType.NUMERIC, length=6, customField = true, customFieldMapper=EnumProcessingCodeCustomField.class)
+	protected ProcessingCode processingCode = ProcessingCode.yes;
 	
 	@Iso8583Field(index=7, type=IsoType.DATE10)
 	protected Date dateTransaction = new GregorianCalendar(2000, 1, 1, 1 ,1, 1).getTime();
@@ -168,7 +244,7 @@ public class AbstractMessage implements Serializable{
 		/**
 		 * @return the processingCode
 		 */
-		public Integer getProcessingCode() {
+		public ProcessingCode getProcessingCode() {
 			return processingCode;
 		}
 
@@ -176,7 +252,7 @@ public class AbstractMessage implements Serializable{
 		 * @param processingCode the processingCode to set
 		 * @return AbstractMessage for convenience chaining
 		 */
-		public AbstractMessage setProcessingCode(Integer processingCode) {
+		public AbstractMessage setProcessingCode(ProcessingCode processingCode) {
 			this.processingCode = processingCode;
 			return this;
 		}

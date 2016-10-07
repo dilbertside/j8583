@@ -176,7 +176,7 @@ public class PojoUtils {
 	 * @param classParameterizedType target
 	 * @return true 
 	 */
-	public static boolean isAssignable(final Class<?> parameterizedClass, final Class<?> classParameterizedType) {
+	public static boolean isParameterizedAssignable(final Class<?> parameterizedClass, final Class<?> classParameterizedType) {
 		ParameterizedType parameterizedType = extractParameterizedTypeFromInterface(parameterizedClass);
 		if (parameterizedType == null) {
 			//Class and any of its interfaces are not parameterized
@@ -215,6 +215,17 @@ public class PojoUtils {
 			}
 		}
 		return null;
+	}
+	
+	/**
+	 * wrapper around {@link TypeUtils#isAssignable(Type, Type)}<br>
+	 * to avoid non necessary imports
+	 * @param type the subject type to be assigned to the target type
+     * @param toType the target type
+     * @return {@code true} if {@code type} is assignable to {@code toType}.
+	 */
+	public static boolean isAssignable(final Class<?> type, final Class<?> toType) {
+		return TypeUtils.isAssignable(type, toType);
 	}
 	
 	/**
