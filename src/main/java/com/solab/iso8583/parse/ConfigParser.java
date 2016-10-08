@@ -514,7 +514,6 @@ public class ConfigParser {
 						combo.addParser(getParser(isoValue2, mfact));
 					}
 				}
-			}else{
 			}
 			fieldParseInfo = getParser(isoValue, mfact);
 			parseMap.put(indexField, fieldParseInfo);

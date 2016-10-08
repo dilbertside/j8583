@@ -144,7 +144,7 @@ public class AbstractMessage implements Serializable{
 		}
 		
 		public String toString(){
-			return getLabel();
+			return "" + getCode();
 		}
 
 	}
@@ -166,7 +166,7 @@ public class AbstractMessage implements Serializable{
 		
 		@Override
 		public String encodeField(ProcessingCode value) {
-			return new StringBuilder(value.code).toString();
+			return value.toString();
 		}
 
 		@Override
@@ -180,7 +180,7 @@ public class AbstractMessage implements Serializable{
 		}
 	}
 	
-	@Iso8583Field(index=3, type=IsoType.NUMERIC, length=6, customField = true, customFieldMapper=EnumProcessingCodeCustomField.class)
+	@Iso8583Field(index=3, type=IsoType.NUMERIC, length=4, customField = true, customFieldMapper=EnumProcessingCodeCustomField.class)
 	protected ProcessingCode processingCode = ProcessingCode.yes;
 	
 	@Iso8583Field(index=7, type=IsoType.DATE10)

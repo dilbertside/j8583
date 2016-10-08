@@ -27,6 +27,7 @@ import com.solab.iso8583.annotation.Iso8583;
 import com.solab.iso8583.annotation.Iso8583Field;
 import com.solab.iso8583.impl.SimpleTraceGenerator;
 import com.solab.iso8583.parse.ConfigParser;
+import com.solab.iso8583.pojo.AbstractMessage.ProcessingCode;
 
 /**
  * @author dilbertside
@@ -235,6 +236,7 @@ public class TestPojoIsoMessage {
 	@Test
 	public void testNewMessageAcquirerFinancialRequestRoundTrip() throws UnsupportedEncodingException, ParseException {
 		AcquirerFinancialRequest request = new AcquirerFinancialRequest();
+		request.setProcessingCode(ProcessingCode.maybe);
 		request.setSystemTraceAuditNumber(systemTraceAuditNumber);
 		//request.setReservedNational("hello world!");
 		request.setAdditionalDataNational("AdditionalDataNational!");
@@ -268,10 +270,7 @@ public class TestPojoIsoMessage {
 	    Assert.assertEquals(request.getCardAcceptorName(), iso.getObjectValue(43));
 	    
 	    Assert.assertEquals(IsoType.LLLVAR, iso.getField(47).getType());
-	    log.debug("nested pojo\n {}", iso.getObjectValue(47));
-	    Assert.assertTrue("must be of type CompositeFieldPojo", iso.getObjectValue(47) instanceof CompositeFieldPojo);
-	    CompositeFieldPojo cf = iso.getObjectValue(47);
-	    Assert.assertEquals(request.getAdditionalDataNational(), cf.getField(1).getValue());
+	    Assert.assertEquals(request.getAdditionalDataNational(), iso.getObjectValue(47));
 	    
 	    //here we go the nested pojo
 	    Assert.assertEquals(IsoType.LLLVAR, iso.getField(48).getType());

@@ -975,6 +975,9 @@ public class MessageFactory<T extends IsoMessage> {
 							CompositeFieldPojo compositeField = (CompositeFieldPojo) objectCompositeField; 
 							Object customValue = isoField.getValueSafeCast(compositeField.getField(1));
 							PojoUtils.writeField(instance, isoField.getPropertyName(), isoField.getFieldClass(), customValue);
+						}else{
+							Object value = isoField.getValueSafeCast(isoValue);
+							PojoUtils.writeField(instance, propName, isoField.getFieldClass(), value);
 						}
 					} else if(isoField.isNested()){
 						Object objectCompositeField = isoMessage.getField(isoField.index).getEncoder();
