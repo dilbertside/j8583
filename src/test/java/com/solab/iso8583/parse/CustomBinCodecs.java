@@ -84,7 +84,7 @@ public class CustomBinCodecs {
         }
         //Test parsing
         tmpl = mfact.parseMessage(buf, 0);
-        Assert.assertEquals(1234567890l, tmpl.getObjectValue(2));
+        Assert.assertEquals(1234567890l, (long)tmpl.getObjectValue(2));
         Assert.assertEquals(b29, tmpl.getObjectValue(3));
     }
 

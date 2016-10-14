@@ -18,6 +18,7 @@ configurations {
 
 dependencies {
 	compile 'org.slf4j:slf4j-api:1.7.21'
+	compile 'commons-lang:commons-lang:2.6'
 	testCompile 'junit:junit:4.12'
 	testRuntime 'org.slf4j:slf4j-simple:1.7.21'
 }
